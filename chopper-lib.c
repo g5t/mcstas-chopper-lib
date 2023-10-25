@@ -157,7 +157,11 @@ void print_help(const char * program_name) {
 void print_one(const char * name, double value) {
   printf("  %s = % 10.4f\n", name, value);
 }
-
+/*
+ * toff=fabs(t-atan2(x,yprime)/omega - delay - (jitter ? jitter*randnorm():0));
+   // does neutron hit outside slit? *
+   if (fmod(toff+To/2.0,Tg)>To) ABSORB;
+ */
 
 /****************** chopper train functionality ************************/
 range_set chopper_inverse_velocity_windows(unsigned count, const chopper_parameters * choppers,
@@ -168,9 +172,12 @@ range_set chopper_inverse_velocity_windows(unsigned count, const chopper_paramet
   limits.ranges[0].minimum = inv_v_min;
   limits.ranges[0].maximum = inv_v_max;
   for (unsigned i=0; i<count && limits.count; ++i) if (choppers[i].speed) {
+    // the period of the chopper is a positive time
     double tau = 1.0 / fabs(choppers[i].speed);
+    // the delta time of the chopper is half the time it takes to rotate through the angle of the slit
     double dt = choppers[i].angle / 360.0 / 2.0 * tau;
-    double t0 = choppers[i].phase / 360.0 / choppers[i].speed;
+    // to match McStas DiskChopper, the delay time depends on the absolute value of the speed?
+    double t0 = choppers[i].phase / 360.0 / fabs(choppers[i].speed);
     // find the smallest n for which (t0 + dt + n * tau) / d >= inv_v_min
     int n_min = (int) floor((choppers[i].path * inv_v_min - t0 - dt) / tau);
     // find the largest n for which (t0 - dt + n * tau) / d <= inv_v_max
