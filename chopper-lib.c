@@ -10,10 +10,14 @@
 #include "chopper-lib.h"
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /******************************** range functions ************************************/
 void range_sort(range a){
   if (a.maximum < a.minimum){
-    double tmp = a.minimum;
+    const double tmp = a.minimum;
     a.minimum = a.maximum;
     a.maximum = tmp;
   }
@@ -74,7 +78,7 @@ range_set range_set_sort(range_set s){
   }
 }
 
-range_set range_intersection(range_set ain, range_set bin){
+range_set range_intersection(const range_set ain, const range_set bin){
   range_set a = range_set_sort(ain);
   range_set b = range_set_sort(bin);
   range_set out;
@@ -103,7 +107,6 @@ range_set range_intersection(range_set ain, range_set bin){
   i = 0;
   j = 0;
   unsigned k=0;
-  range tmp;
   while (i < a.count && j < b.count){
     switch (classify_range_overlap(a.ranges + i, b.ranges + j)) {
       case -3: { // |B|AB|A|; keep (A[i]min, B[j]max) increment j since A extends to higher value
@@ -148,15 +151,15 @@ range_set range_intersection(range_set ain, range_set bin){
 }
 
 /********************** local helper functions *************************/
-void print_help(const char * program_name) {
-  printf("Usage: %s [parameter name]=value ...\n", program_name);
-  printf("\tValid parameter names: xxNtype for xx in (ps, fo, bw), N in (1, 2), and type in (speed, phase)\n");
-  exit(0);
-}
-
-void print_one(const char * name, double value) {
-  printf("  %s = % 10.4f\n", name, value);
-}
+// void print_help(const char * program_name) {
+//   printf("Usage: %s [parameter name]=value ...\n", program_name);
+//   printf("\tValid parameter names: xxNtype for xx in (ps, fo, bw), N in (1, 2), and type in (speed, phase)\n");
+//   exit(0);
+// }
+//
+// void print_one(const char * name, const double value) {
+//   printf("  %s = %+10.4f\n", name, value);
+// }
 /*
  * toff=fabs(t-atan2(x,yprime)/omega - delay - (jitter ? jitter*randnorm():0));
    // does neutron hit outside slit? *
@@ -164,8 +167,9 @@ void print_one(const char * name, double value) {
  */
 
 /****************** chopper train functionality ************************/
-range_set chopper_inverse_velocity_windows(unsigned count, const chopper_parameters * choppers,
-                                           double inv_v_min, double inv_v_max, double latest_emission){
+range_set chopper_inverse_velocity_windows(const unsigned count, const chopper_parameters * choppers,
+                                           const double inv_v_min, const double inv_v_max,
+                                           const double latest_emission){
   range_set limits;
   limits.count = 1;
   limits.ranges = calloc(1, sizeof(range));
@@ -173,15 +177,15 @@ range_set chopper_inverse_velocity_windows(unsigned count, const chopper_paramet
   limits.ranges[0].maximum = inv_v_max;
   for (unsigned i=0; i<count && limits.count; ++i) if (choppers[i].speed) {
     // the period of the chopper is a positive time
-    double tau = 1.0 / fabs(choppers[i].speed);
+    const double tau = 1.0 / fabs(choppers[i].speed);
     // the delta time of the chopper is half the time it takes to rotate through the angle of the slit
-    double dt = choppers[i].angle / 360.0 / 2.0 * tau;
+    const double dt = choppers[i].angle / 360.0 / 2.0 * tau;
     // to match McStas DiskChopper, the delay time depends on the absolute value of the speed?
-    double t0 = choppers[i].phase / 360.0 / fabs(choppers[i].speed);
+    const double t0 = choppers[i].phase / 360.0 / fabs(choppers[i].speed);
     // find the smallest n for which (t0 + dt + n * tau) / d >= inv_v_min
-    int n_min = (int) floor((choppers[i].path * inv_v_min - t0 - dt) / tau);
+    const int n_min = (int) floor((choppers[i].path * inv_v_min - t0 - dt) / tau);
     // find the largest n for which (t0 - dt + n * tau) / d <= inv_v_max
-    int n_max = (int) ceil((choppers[i].path * inv_v_max - t0 + dt) / tau);
+    const int n_max = (int) ceil((choppers[i].path * inv_v_max - t0 + dt) / tau);
     // collect the ranges for each of the n in (n_min, n_max) into a set:
     range_set ith;
     ith.count = (unsigned)(n_max - n_min + 1);
@@ -192,7 +196,7 @@ range_set chopper_inverse_velocity_windows(unsigned count, const chopper_paramet
     }
     unsigned c=0;
     for (unsigned j=0; j < ith.count; ++j) {
-      double n_tau = tau * (double) (n_min + (int) j);
+      const double n_tau = tau * (double) (n_min + (int) j);
       // let the minimum 1/v come from the *end* of the pulse:
       double j_min = (t0 - dt + n_tau - latest_emission) / choppers[i].path;
       double j_max = (t0 + dt + n_tau) / choppers[i].path;
@@ -217,9 +221,10 @@ range_set chopper_inverse_velocity_windows(unsigned count, const chopper_paramet
 
 
 unsigned chopper_inverse_velocity_limits(double * lower, double * upper,
-                                         unsigned count, const chopper_parameters * choppers,
-                                         double inv_v_min, double inv_v_max, double latest_emission){
-  range_set limits = chopper_inverse_velocity_windows(count, choppers, inv_v_min, inv_v_max, latest_emission);
+                                         const unsigned count, const chopper_parameters * choppers,
+                                         const double inv_v_min, const double inv_v_max,
+                                         const double latest_emission){
+  const range_set limits = chopper_inverse_velocity_windows(count, choppers, inv_v_min, inv_v_max, latest_emission);
   if (limits.count){
     *lower = limits.ranges[0].minimum;
     *upper = limits.ranges[limits.count-1].maximum;
@@ -238,14 +243,18 @@ unsigned chopper_inverse_velocity_limits(double * lower, double * upper,
 #ifndef PI
 #define PI 3.14159265358979323846
 #endif
-unsigned chopper_wavelength_limits(double * lower, double * upper, unsigned count, const chopper_parameters * choppers,
-                                   double lambda_min, double lambda_max, double latest_emission){
-  unsigned windows = chopper_inverse_velocity_limits(lower, upper, count, choppers,
-                                                     lambda_min * V2K / 2 / PI, lambda_max * V2K / 2 / PI,
-                                                     latest_emission);
+unsigned chopper_wavelength_limits(double * lower, double * upper,
+                                   const unsigned count, const chopper_parameters * choppers,
+                                   const double lambda_min, const double lambda_max, const double latest_emission){
+  const unsigned windows = chopper_inverse_velocity_limits(
+    lower, upper, count, choppers, lambda_min * V2K / 2 / PI, lambda_max * V2K / 2 / PI, latest_emission);
   if (windows) {
     *lower *= K2V * 2 * PI;
     *upper *= K2V * 2 * PI;
   }
   return windows;
 }
+
+#ifdef __cplusplus
+} // end EXTERN "C"
+#endif
